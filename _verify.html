@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PARA verify</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <div style="padding:80px;text-align:center;color:#5f6b62">Loading PARA…</div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <script src="assets/logo.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/geo.js"></script>
+  <script src="assets/analytics.js"></script>
+  <script src="assets/views-public.js"></script>
+  <script src="assets/views-admin.js"></script>
+  <script src="assets/views-driver.js"></script>
+  <script src="assets/views-passenger.js"></script>
+  <script src="assets/app.js"></script>
+  <script src="assets/knowledge.js"></script>
+  <script src="assets/assistant.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var errors = [];
+    var pass = 0;
+
+    window.addEventListener("error", function (e) {
+      errors.push("window.onerror: " + (e.message || String(e.error)));
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+      errors.push("unhandledrejection: " + String(e.reason && e.reason.message || e.reason));
+    });
+    var origErr = console.error;
+    console.error = function () {
+      errors.push("console.error: " + Array.prototype.slice.call(arguments).join(" "));
+      origErr.apply(console, arguments);
+    };
+
+    function ok(cond, msg) {
+      if (cond) { pass++; } else { errors.push("FAIL: " + msg); }
+    }
+
+    var FILES = [
+      "index.html", "assets/logo.js", "assets/store.js", "assets/geo.js", "assets/analytics.js",
+      "assets/views-public.js", "assets/views-admin.js", "assets/views-driver.js", "assets/views-passenger.js",
+      "assets/app.js", "assets/knowledge.js", "assets/assistant.js", "api/assistant.js", "styles.css"
+    ];
+
+    var VIEWS = [
+      "home", "route", "planner", "login", "signup", "account",
+      "admin", "admin-drivers", "admin-vehicles", "admin-route", "admin-announcements",
+      "admin-incidents", "admin-analytics", "admin-service", "admin-logs", "admin-data",
+      "driver", "driver-trips", "driver-reports",
+      "passenger", "passenger-request-new", "passenger-requests", "passenger-reports", "passenger-alerts"
+    ];
+
+    var ROUTES = [
+      ["#/", null], ["#/route", null], ["#/planner", null], ["#/login", null], ["#/signup", null],
+      ["#/account", "passenger1"],
+      ["#/admin", "admin"], ["#/admin/drivers", "admin"], ["#/admin/vehicles", "admin"],
+      ["#/admin/route", "admin"], ["#/admin/announcements", "admin"], ["#/admin/incidents", "admin"],
+      ["#/admin/analytics", "admin"], ["#/admin/service", "admin"], ["#/admin/logs", "admin"], ["#/admin/data", "admin"],
+      ["#/driver", "driver1"], ["#/driver/trips", "driver1"], ["#/driver/reports", "driver1"],
+      ["#/passenger", "passenger1"], ["#/passenger/request-new", "passenger1"],
+      ["#/passenger/requests", "passenger1"], ["#/passenger/reports", "passenger1"], ["#/passenger/alerts", "passenger1"]
+    ];
+
+    function fetchChecks() {
+      return Promise.all(FILES.map(function (f) {
+        return fetch(f).then(function (r) {
+          ok(r.ok, "file " + f + " served (HTTP " + r.status + ")");
+          return r.text();
+        }).then(function (t) {
+          ok(t.length > 0, "file " + f + " not empty");
+          if (/\.js$/.test(f)) {
+            try { new Function(t); ok(true, "syntax " + f); }
+            catch (e) { ok(false, "syntax " + f + ": " + e.message); }
+          }
+        }).catch(function (e) {
+          ok(false, "fetch " + f + ": " + e.message);
+        });
+      }));
+    }
+
+    function coreChecks() {
+      var names = ["store", "auth", "geo", "analytics", "views", "sim", "ui", "log", "fmt", "esc", "tag", "CONST", "titleize", "render", "boot"];
+      names.forEach(function (n) { ok(PARA[n] !== undefined && PARA[n] !== null, "PARA." + n + " defined"); });
+
+      ok(!!document.querySelector(".topbar"), "topbar rendered on boot");
+      ok(document.getElementById("app").textContent.indexOf("Loading PARA") === -1, "boot replaced the loading state");
+
+      VIEWS.forEach(function (v) { ok(typeof PARA.views[v] === "function", "view '" + v + "' is a function"); });
+
+      var db = PARA.store.db;
+      ok(db && db.users.length >= 6, "seeded users (" + (db ? db.users.length : 0) + ")");
+      ok(db && db.vehicles.length >= 3, "seeded vehicles");
+      ok(db && db.stops.length >= 8, "seeded stops");
+      ok(db && db.trips.length >= 10, "seeded trips");
+      ok(db && db.requests.length >= 10, "seeded requests");
+      ok(db && db.notifications.length >= 1, "seeded notifications");
+
+      ok(PARA.auth.login("passenger1", "passenger123").ok, "login passenger1");
+      ok(PARA.auth.login("driver3", "driver123").ok === false, "deactivated driver3 login refused");
+      ok(PARA.auth.login("admin", "wrong").ok === false, "wrong password refused");
+      PARA.auth.logout();
+      ok(PARA.auth.user() === null, "logout clears session");
+
+      ok(Array.isArray(PARA.KB) && PARA.KB.length >= 10, "knowledge base loaded (" + (PARA.KB ? PARA.KB.length : 0) + " notes)");
+      ok(PARA.KB.every(function (d) { return d.id && d.title && d.text && d.tags; }), "every knowledge note has id, title, tags and text");
+      var kbHits = PARA.kbRetrieve("which stops are on the route", 3, "#/route");
+      ok(kbHits.length >= 1 && kbHits[0].id === "route-stops", "retrieval returns the route note first (" + (kbHits[0] && kbHits[0].id) + ")");
+      ok(PARA.kbPageDoc("#/admin/analytics") === "admin-features" && PARA.kbPageDoc("#/planner") === "trip-planner", "page-to-note mapping works");
+      ok(!!PARA.assistant && typeof PARA.assistant.ask === "function" && typeof PARA.assistant.open === "function", "assistant widget API available");
+      ok(!!document.getElementById("as-fab") && !!document.getElementById("as-panel"), "assistant DOM mounted outside #app");
+    }
+
+    function routeChecks() {
+      ROUTES.forEach(function (r) {
+        var hash = r[0], uname = r[1];
+        PARA.auth.logout();
+        if (uname) {
+          var cred = { admin: "admin123", driver1: "driver123", passenger1: "passenger123" }[uname];
+          var res = PARA.auth.login(uname, cred);
+          ok(res.ok, "login " + uname + " for " + hash);
+        }
+        location.hash = hash;
+        try {
+          PARA.render();
+          var view = document.getElementById("view");
+          ok(!!view && view.innerHTML.length > 60, "render " + hash + " produced content");
+          ok(!view || view.innerHTML.indexOf("not available") === -1, "render " + hash + " has a real view");
+          ok(document.querySelector(".topbar") !== null, "topbar present for " + hash);
+        } catch (e) {
+          ok(false, "render " + hash + " threw: " + e.message);
+        }
+      });
+
+      var vw = document.documentElement.clientWidth;
+      ok(document.documentElement.scrollWidth <= vw + 2, "no page horizontal overflow (" + document.documentElement.scrollWidth + " <= " + vw + ")");
+      ok(!!document.getElementById("as-fab") && !!document.getElementById("as-panel"), "assistant survives view re-renders");
+    }
+
+    function simChecks() {
+      try {
+        for (var i = 0; i < 5; i++) PARA.sim.tick();
+        ok(true, "sim tick x5 without errors");
+      } catch (e) {
+        ok(false, "sim tick threw: " + e.message);
+      }
+      ok(typeof PARA.geo.refreshStopEtas === "function", "refreshStopEtas callable");
+      try { PARA.geo.refreshStopEtas(); ok(true, "refreshStopEtas ran"); } catch (e) { ok(false, "refreshStopEtas threw: " + e.message); }
+    }
+
+    function report() {
+      var lines = [];
+      lines.push(errors.length === 0 ? "VERIFY-PASS" : "VERIFY-FAIL (" + errors.length + ")");
+      lines.push("checks passed: " + pass);
+      lines.push("viewport: " + document.documentElement.clientWidth + "  pageScrollWidth: " + document.documentElement.scrollWidth);
+      lines.push("errors captured: " + errors.length);
+      errors.forEach(function (e) { lines.push("  - " + e); });
+      document.title = errors.length ? "VERIFY-FAIL" : "VERIFY-PASS";
+      document.body.innerHTML = "<pre id='report' style='margin:0;padding:14px;background:#fff;color:#000;font:15px/1.6 Consolas,monospace;white-space:pre-wrap'>" +
+        lines.join("\n").replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</pre>";
+    }
+
+    window.addEventListener("load", function () {
+      fetchChecks().then(function () {
+        try { coreChecks(); } catch (e) { ok(false, "coreChecks threw: " + e.message); }
+        try { routeChecks(); } catch (e) { ok(false, "routeChecks threw: " + e.message); }
+        try { simChecks(); } catch (e) { ok(false, "simChecks threw: " + e.message); }
+      }).then(function () {
+        setTimeout(report, 400);
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

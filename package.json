@@ -1,0 +1,22 @@
+{
+  "name": "para-transport-assistant",
+  "version": "1.0.0",
+  "description": "PARA — Passenger Alert and Routing Assistant",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "transit",
+    "transportation",
+    "assistant",
+    "ai"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,25 @@
+# Local-only folders (full-stack prototype not used by the static site)
+backend/
+frontend/
+node_modules/
+
+# Local launchers and dev harnesses
+start-para.bat
+start-para.ps1
+_shot.html
+_e2e.html
+_verify.html
+_probe.html
+test.js
+bundle.js
+dist/
+*.zip
+
+# Unused source images (the site uses istockphoto-1488597778-612x612.jpg as its backdrop)
+/825311350_1612856260577800_2919236640084418386_n.png
+/OIP.webp
+
+# Editor / tooling metadata
+.kilo/
+.git/
+*.md

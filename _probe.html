@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PARA assistant probe</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app">
+    <div style="padding:80px;text-align:center;color:#5f6b62">Loading PARA…</div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <pre id="probe-out" style="position:fixed;inset:0;z-index:999;overflow:auto;margin:0;padding:14px;background:#fff;color:#000;font:13px/1.5 Consolas,monospace;white-space:pre-wrap">starting…</pre>
+
+  <script src="assets/logo.js"></script>
+  <script src="assets/store.js"></script>
+  <script src="assets/geo.js"></script>
+  <script src="assets/analytics.js"></script>
+  <script src="assets/views-public.js"></script>
+  <script src="assets/views-admin.js"></script>
+  <script src="assets/views-driver.js"></script>
+  <script src="assets/views-passenger.js"></script>
+  <script src="assets/app.js"></script>
+  <script src="assets/knowledge.js"></script>
+  <script src="assets/assistant.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var out = [];
+    function log(s) {
+      out.push(s);
+      var pre = document.getElementById("probe-out");
+      if (pre) pre.textContent = out.join("\n");
+    }
+    window.addEventListener("error", function (e) { log("window.onerror: " + (e.message || e.error)); });
+
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        try {
+          log("VIEWPORT: " + window.innerWidth + "x" + document.documentElement.clientWidth + " scroll " + document.documentElement.scrollWidth);
+          log("KB-DOCS: " + (PARA.KB ? PARA.KB.length : -1));
+          log("KB-HITS: " + (PARA.kbRetrieve ? PARA.kbRetrieve("trip planner and stops", 4, "#/planner").map(function (d) { return d.id; }).join(",") : "none"));
+          log("PAGE-DOC: " + PARA.kbPageDoc("#/admin/analytics") + "," + PARA.kbPageDoc("#/route") + "," + PARA.kbPageDoc("#/"));
+          log("ASSISTANT: " + (PARA.assistant ? "mounted" : "missing"));
+          PARA.assistant.open();
+          log("OPEN: " + PARA.assistant.isOpen());
+          PARA.assistant.ask("What can I do as a passenger?").then(function (res) {
+            log("ASK: " + (res ? "reply received" : "failed"));
+            var h = PARA.assistant.history();
+            var last = h[h.length - 1];
+            log("ANSWER: " + (last && last.content ? last.content.slice(0, 500).replace(/\n/g, " / ") : "(none)"));
+            log("SOURCES: " + (last && last.sources ? last.sources.join(" | ") : "(none)"));
+            log("DOM-MSGS: " + document.querySelectorAll("#as-msgs .as-msg").length);
+            if (/visual=1/.test(location.search)) {
+              document.getElementById("probe-out").style.display = "none";
+            }
+            document.title = res ? "PROBE-DONE" : "PROBE-FAIL";
+          });
+        } catch (e) {
+          log("ERROR: " + e.message);
+          document.title = "PROBE-FAIL";
+        }
+      }, 300);
+    });
+  })();
+  </script>
+</body>
+</html>
